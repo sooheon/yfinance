@@ -147,7 +147,9 @@ class TickerBase:
                 return utils.empty_df()
 
             if end is None:
-                end = int(_time.time())
+                dt_now = _pd.Timestamp(_datetime.datetime.utcnow()).tz_localize("UTC")
+                midnight = _pd.Timestamp.combine(dt_now.tz_convert(tz).date()+_datetime.timedelta(days=1), _datetime.time(0)).tz_localize(tz)
+                end = int(midnight.timestamp())
             else:
                 end = utils._parse_user_dt(end, tz)
             if start is None:
@@ -195,6 +197,7 @@ class TickerBase:
                 timeout=timeout
             )
             if "Will be right back" in data.text or data is None:
+                self._data.session_cache_prune_url(url)
                 raise RuntimeError("*** YAHOO! FINANCE IS CURRENTLY DOWN! ***\n"
                                    "Our engineers are working quickly to resolve "
                                    "the issue. Thank you for your patience.")
@@ -635,6 +638,7 @@ class TickerBase:
             data = self._data.get(url=url, params=params, proxy=proxy, timeout=timeout)
             data = data.json()
         except Exception as e:
+            self._data.session_cache_prune_url(url)
             if debug_mode:
                 print("Failed to get ticker '{}' reason: {}".format(self.ticker, e))
             return None
@@ -654,6 +658,9 @@ class TickerBase:
                         print("-------------")
                         print(" {}".format(data))
                         print("-------------")
+
+        # If here then failed
+        self._data.session_cache_prune_url(url)
         return None
 
     def get_recommendations(self, proxy=None, as_dict=False):
@@ -867,6 +874,7 @@ class TickerBase:
         url = "{}/v1/finance/search?q={}".format(self._base_url, self.ticker)
         data = self._data.get(url=url, proxy=proxy)
         if "Will be right back" in data.text:
+            self._data.session_cache_prune_url(self._base_url)
             raise RuntimeError("*** YAHOO! FINANCE IS CURRENTLY DOWN! ***\n"
                                "Our engineers are working quickly to resolve "
                                "the issue. Thank you for your patience.")
@@ -899,6 +907,7 @@ class TickerBase:
             data = self._data.get(url=url, proxy=proxy).text
 
             if "Will be right back" in data:
+                self._data.session_cache_prune_url(url)
                 raise RuntimeError("*** YAHOO! FINANCE IS CURRENTLY DOWN! ***\n"
                                    "Our engineers are working quickly to resolve "
                                    "the issue. Thank you for your patience.")
